@@ -30,7 +30,7 @@
     .muted{color:var(--muted);font-size:13px}
 
     .ads{background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));padding:10px;border-radius:10px;text-align:center;color:var(--muted);}
-    .ad-pill{padding:8px;border-radius:8px;border:1px dashed rgba(255,255,255,0.03);display:inline-block;margin:8px 0}
+    .ad-pill{padding:8px;border-radius:8px;border:1px dashed rgba(255,255,255,0.03);display:inline-block;margin:8px 0; width:100%}
 
     .comments{margin-top:8px}
     .comment{padding:8px;border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.01)}
@@ -86,36 +86,18 @@
           <div class="muted">Sponsored</div>
 
           <!-- Adsterra Slot 1 — 300x250 -->
-          <div class="ad-pill" style="min-height:260px;display:flex;justify-content:center;align-items:center">
-            <!-- Adsterra Script -->
-            <script type="text/javascript">
-              atOptions = {
-                'key' : '5302880a526d9389e6ff45a2dfe76871',
-                'format' : 'iframe',
-                'height' : 250,
-                'width' : 300,
-                'params' : {}
-              };
-            </script>
-            <script type="text/javascript" src="//www.highperformanceformat.com/5302880a526d9389e6ff45a2dfe76871/invoke.js"></script>
+          <div class="ad-pill">
+            <div class="muted" id="fallback-1">Ad slot 1 — 300x250</div>
+            <div id="ad-300x250" style="min-height:250px; display:flex; align-items:center; justify-content:center"></div>
           </div>
 
           <!-- Adsterra Slot 2 — 300x100 -->
-          <div class="ad-pill" style="min-height:120px;display:flex;justify-content:center;align-items:center">
-            <!-- Adsterra Script (same key; Adsterra supports multiple placements) -->
-            <script type="text/javascript">
-              atOptions = {
-                'key' : '5302880a526d9389e6ff45a2dfe76871',
-                'format' : 'iframe',
-                'height' : 100,
-                'width' : 300,
-                'params' : {}
-              };
-            </script>
-            <script type="text/javascript" src="//www.highperformanceformat.com/5302880a526d9389e6ff45a2dfe76871/invoke.js"></script>
+          <div class="ad-pill">
+            <div class="muted" id="fallback-2">Ad slot 2 — 300x100</div>
+            <div id="ad-300x100" style="min-height:100px; display:flex; align-items:center; justify-content:center"></div>
           </div>
 
-          <div class="muted" style="font-size:12px;margin-top:6px">These are live Adsterra slots.</div>
+          <div class="muted" style="font-size:12px;margin-top:6px">These are live Adsterra slots. (Ads are skipped on localhost.)</div>
         </div>
 
         <div style="height:12px"></div>
@@ -180,6 +162,7 @@
       return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
     }
     function newId(n=16){const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join('');}
+    const isLocalhost = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 
     /* ---------- State ---------- */
     let currentUser = localStorage.getItem("anonUser") || null;
@@ -370,7 +353,6 @@
       const usersCount = (await db.collection("users").get()).size;
       const postsCount = (await db.collection("posts").get()).size;
 
-      // Count comments via collection group
       let commentsCount = 0;
       try{
         const cgSnap = await db.collectionGroup("comments").get();
@@ -426,8 +408,7 @@
         `;
         container.appendChild(el);
 
-        /* Inline ad after every 4 posts — keep as simple placeholder
-           (dynamic third-party scripts injected via innerHTML often won’t execute) */
+        // inline placeholder ad every 4 posts (kept from original)
         if(i%4===3){
           const ad = document.createElement('div');
           ad.className='card ads';
@@ -437,6 +418,36 @@
         }
         i++;
       }
+    }
+
+    /* ---------- Adsterra (sequential, container-targeted, HTTPS) ---------- */
+    function loadAdInto(containerId, opts){
+      return new Promise((resolve, reject)=>{
+        const container = document.getElementById(containerId);
+        if(!container){ resolve(); return; }
+        // hide fallback text if present
+        const prev = container.previousElementSibling;
+        if(prev && prev.id && prev.id.startsWith('fallback-')) prev.style.display='none';
+
+        window.atOptions = Object.assign({
+          key: '5302880a526d9389e6ff45a2dfe76871',
+          format: 'iframe',
+          params: {}
+        }, opts);
+
+        const s = document.createElement('script');
+        s.src = 'https://www.highperformanceformat.com/5302880a526d9389e6ff45a2dfe76871/invoke.js';
+        s.async = true;
+        s.onload = ()=>resolve();
+        s.onerror = ()=>{ if(prev) prev.style.display=''; resolve(); };
+        container.innerHTML = ''; // clear any placeholder
+        container.appendChild(s);
+      });
+    }
+    async function loadAds(){
+      if(isLocalhost) return; // skip ads locally to avoid network/redirect issues
+      await loadAdInto('ad-300x250', {height:250, width:300});
+      await loadAdInto('ad-300x100', {height:100, width:300});
     }
 
     /* ---------- Wire up & init ---------- */
@@ -455,6 +466,7 @@
       await ensureAdmin();
       await trackVisits();
       updateUserUI();
+      await loadAds();
     })();
   </script>
 </body>
