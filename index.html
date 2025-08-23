@@ -17,7 +17,7 @@
     nav{display:flex;gap:8px;align-items:center}
     button.btn{background:var(--glass);border:1px solid rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px;color:var(--accent);cursor:pointer}
 
-    /* Search bar (added) */
+    /* Search bar */
     .search{flex:1;max-width:360px;min-width:180px}
     .search input{width:100%;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);color:inherit;font-size:14px;transition:all .2s}
     .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(110,231,183,0.2)}
@@ -61,7 +61,7 @@
           <div class="muted">Make posts. Stay anonymous. Clean UI.</div>
         </div>
       </div>
-      <!-- Search bar (added) -->
+      <!-- Search bar -->
       <div class="search">
         <input id="searchInput" type="text" placeholder="Search posts..." aria-label="Search posts" />
       </div>
@@ -94,7 +94,7 @@
         <div class="card ads">
           <div class="muted">Sponsored</div>
 
-          <!-- ===== Adsterra placement #1 (official snippet, synchronous) ===== -->
+          <!-- ===== Adsterra placement #1 (official snippet) ===== -->
           <div class="ad-pill">
             <script type="text/javascript">
               atOptions = {
@@ -108,7 +108,7 @@
             <script type="text/javascript" src="https://www.highperformanceformat.com/5302880a526d9389e6ff45a2dfe76871/invoke.js"></script>
           </div>
 
-          <!-- ===== Adsterra placement #2 (official snippet, synchronous) ===== -->
+          <!-- ===== Adsterra placement #2 (official snippet) ===== -->
           <div class="ad-pill">
             <script type="text/javascript">
               atOptions = {
@@ -122,7 +122,7 @@
             <script type="text/javascript" src="https://www.highperformanceformat.com/5302880a526d9389e6ff45a2dfe76871/invoke.js"></script>
           </div>
 
-          <div class="muted" style="font-size:12px;margin-top:6px">Ads load only if your GitHub Pages domain is approved in Adsterra and no blockers are active.</div>
+          <div class="muted" style="font-size:12px;margin-top:6px">Ads load only if your domain is approved in Adsterra and no blockers are active.</div>
         </div>
 
         <div style="height:12px"></div>
@@ -175,9 +175,17 @@
     try { firebase.analytics(); } catch(e){}
 
     /* ---------- Helpers ---------- */
-    function escapeHtml(str){return str?str.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"):"";}
-    function fmt(ts){ if(!ts) return "just now"; if(ts.toDate) return ts.toDate().toLocaleString(); return new Date(ts).toLocaleString(); }
-    async function sha256Hex(text){ const enc=new TextEncoder().encode(text); const buf=await crypto.subtle.digest('SHA-256',enc); return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+    function escapeHtml(str){return str?str.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"):'';}
+    function fmt(ts){
+      if(!ts) return "just now";
+      if(ts.toDate) return ts.toDate().toLocaleString();
+      return new Date(ts).toLocaleString();
+    }
+    async function sha256Hex(text){
+      const enc=new TextEncoder().encode(text);
+      const buf=await crypto.subtle.digest('SHA-256',enc);
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
     function newId(n=16){const a=new Uint8Array(n);crypto.getRandomValues(a);return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join('');}
 
     /* ---------- State ---------- */
@@ -357,8 +365,11 @@
       `;
     }
 
-    /* ---------- Render posts (now supports search) ---------- */
+    /* ---------- Render posts (search + async dedupe) ---------- */
+    let renderVersion = 0; // increases for each render to cancel outdated ones
+
     async function renderPosts(){
+      const myVersion = ++renderVersion;
       const container = document.getElementById('postsArea');
       container.innerHTML = '';
       const qEl = document.getElementById('searchInput');
@@ -375,7 +386,12 @@
 
       let i=0;
       for(const p of list){
+        if(myVersion !== renderVersion) return; // cancel outdated render
+
         const comments = await fetchComments(p.id);
+
+        if(myVersion !== renderVersion) return; // still latest?
+
         const el = document.createElement('div');
         el.className = 'card post';
         el.innerHTML = `
@@ -408,7 +424,7 @@
         `;
         container.appendChild(el);
 
-        // keep the simple inline placeholder every 4 posts
+        // inline ad every 4 posts (kept from original)
         if(i%4===3){
           const ad = document.createElement('div');
           ad.className='card ads';
@@ -429,13 +445,20 @@
       hideSignIn();
     });
 
-    // Live search
+    // Debounced live search (+ Escape to clear)
+    let searchTimer;
     const searchInput = document.getElementById('searchInput');
     if(searchInput){
-      searchInput.addEventListener('input', ()=>{ renderPosts(); });
-      searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ searchInput.value=''; renderPosts(); }});
+      searchInput.addEventListener('input', ()=>{
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(renderPosts, 200);
+      });
+      searchInput.addEventListener('keydown', (e)=>{
+        if(e.key==='Escape'){ searchInput.value=''; renderPosts(); }
+      });
     }
 
+    // Expose needed fns
     window.vote = vote;
     window.submitComment = submitComment;
 
