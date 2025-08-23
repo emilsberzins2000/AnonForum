@@ -10,12 +10,17 @@
     *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
     html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#071227);color:#e6eef6}
     .container{max-width:1100px;margin:28px auto;padding:18px}
-    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
     .logo{display:flex;align-items:center;gap:12px}
     .logo .mark{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#3ee7c8,#6b8dff);font-weight:800;color:#022}
     h1{margin:0;font-size:20px}
     nav{display:flex;gap:8px;align-items:center}
     button.btn{background:var(--glass);border:1px solid rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px;color:var(--accent);cursor:pointer}
+
+    /* Search bar (added) */
+    .search{flex:1;max-width:360px;min-width:180px}
+    .search input{width:100%;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);color:inherit;font-size:14px;transition:all .2s}
+    .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(110,231,183,0.2)}
 
     .layout{display:grid;grid-template-columns:1fr 320px;gap:18px}
     .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
@@ -37,7 +42,7 @@
 
     footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
 
-    @media (max-width:920px){.layout{grid-template-columns:1fr}.container{padding:8px}}
+    @media (max-width:920px){.layout{grid-template-columns:1fr}.container{padding:8px}.search{max-width:100%}}
   </style>
 
   <!-- Firebase (compat for simple drop-in) -->
@@ -55,6 +60,10 @@
           <h1>AnonForum</h1>
           <div class="muted">Make posts. Stay anonymous. Clean UI.</div>
         </div>
+      </div>
+      <!-- Search bar (added) -->
+      <div class="search">
+        <input id="searchInput" type="text" placeholder="Search posts..." aria-label="Search posts" />
       </div>
       <nav>
         <div id="userInfo"></div>
@@ -348,12 +357,24 @@
       `;
     }
 
-    /* ---------- Render posts ---------- */
+    /* ---------- Render posts (now supports search) ---------- */
     async function renderPosts(){
       const container = document.getElementById('postsArea');
       container.innerHTML = '';
+      const qEl = document.getElementById('searchInput');
+      const query = (qEl && qEl.value ? qEl.value : '').toLowerCase();
+
+      // Filter client-side by title/body/display_name
+      const list = query
+        ? postCache.filter(p => (
+            (p.title||'').toLowerCase().includes(query) ||
+            (p.body||'').toLowerCase().includes(query) ||
+            (p.display_name||'').toLowerCase().includes(query)
+          ))
+        : postCache;
+
       let i=0;
-      for(const p of postCache){
+      for(const p of list){
         const comments = await fetchComments(p.id);
         const el = document.createElement('div');
         el.className = 'card post';
@@ -407,6 +428,13 @@
       document.getElementById('password').value='';
       hideSignIn();
     });
+
+    // Live search
+    const searchInput = document.getElementById('searchInput');
+    if(searchInput){
+      searchInput.addEventListener('input', ()=>{ renderPosts(); });
+      searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ searchInput.value=''; renderPosts(); }});
+    }
 
     window.vote = vote;
     window.submitComment = submitComment;
