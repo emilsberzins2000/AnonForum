@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AnonForum — anonymous, slick, fast</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#6ee7b7;--glass: rgba(255,255,255,0.03)}
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#071227);color:#e6eef6}
+    .container{max-width:1100px;margin:28px auto;padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+    .logo{display:flex;align-items:center;gap:12px}
+    .logo .mark{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#3ee7c8,#6b8dff);font-weight:800;color:#022}
+    h1{margin:0;font-size:20px}
+    nav{display:flex;gap:8px;align-items:center}
+    button.btn{background:var(--glass);border:1px solid rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px;color:var(--accent);cursor:pointer}
+
+    /* Search bar */
+    .search{flex:1;max-width:360px;min-width:180px}
+    .search input{width:100%;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);background:rgba(255,255,255,0.02);color:inherit;font-size:14px;transition:all .2s}
+    .search input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(110,231,183,0.2)}
+
+    .layout{display:grid;grid-template-columns:1fr 320px;gap:18px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+
+    .post-form textarea{width:100%;min-height:90px;background:transparent;border:1px dashed rgba(255,255,255,0.03);padding:10px;border-radius:8px;color:inherit}
+    input[type=text], input[type=password]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit}
+
+    .post{display:flex;gap:12px;padding:12px;border-radius:10px;margin-bottom:12px}
+    .score{width:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.02);border-radius:8px}
+    .post .body{flex:1}
+    .post .title{font-weight:700;margin-bottom:6px}
+    .muted{color:var(--muted);font-size:13px}
+
+    .ads{background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));padding:10px;border-radius:10px;text-align:center;color:var(--muted);}
+    .ad-pill{padding:8px;border-radius:8px;border:1px dashed rgba(255,255,255,0.03);display:inline-block;margin:8px 0;width:100%}
+
+    .comments{margin-top:8px}
+    .comment{padding:8px;border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.01)}
+
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+
+    @media (max-width:920px){.layout{grid-template-columns:1fr}.container{padding:8px}.search{max-width:100%}}
+  </style>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.8/firebase-analytics-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="mark">AF</div>
+        <div>
+          <h1>AnonForum</h1>
+          <div class="muted">Make posts. Stay anonymous. Clean UI.</div>
+        </div>
+      </div>
+      <div class="search">
+        <input id="searchInput" type="text" placeholder="Search posts..." aria-label="Search posts" />
+      </div>
+      <nav>
+        <div id="userInfo"></div>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <main>
+        <div class="card post-form">
+          <form id="postForm">
+            <input id="title" name="title" type="text" placeholder="Post title — be bold" required>
+            <div style="height:8px"></div>
+            <textarea id="body" name="body" placeholder="Write something interesting..." required></textarea>
+            <div style="height:8px"></div>
+            <div style="display:flex;gap:8px;justify-content:space-between;align-items:center">
+              <div class="muted">Posting as: <span id="showAnon">Guest</span></div>
+              <div>
+                <button class="btn" type="submit">Post</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div id="postsArea"></div>
+      </main>
+
+      <aside>
+        <div class="card ads">
+          <div class="muted">Sponsored</div>
+          <div class="ad-pill">Buy cool stuff here</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Updated footer with BTC address -->
+    <footer>
+      Backed by Firebase — shared across everyone.<br>
+      Donate BTC: <code>bc1qlgpjntqwdp0xwa3mqz685w80zwht2t8pe05mlk</code>
+    </footer>
+  </div>
+
+  <!-- Sign-in modal -->
+  <div id="signinModal" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,0.6);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+    <div style="width:420px;background:var(--card);padding:18px;border-radius:12px;margin:auto">
+      <h3 style="margin:0 0 6px 0">Anonymous sign in</h3>
+      <div class="muted" style="margin-bottom:12px">Pick a short display name — protected with a password (hashed) in Firestore.</div>
+      <form id="signinForm">
+        <input id="display_name" type="text" placeholder="Display name (e.g. mysterious42)" autocomplete="username" required>
+        <div style="height:8px"></div>
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+        <div style="height:12px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button type="button" class="btn" id="cancelSignin">Cancel</button>
+          <button class="btn" type="submit">Sign in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Keep all your Firebase/JS logic here (unchanged, including search & dedupe render) -->
+  <script>
+    // (Your full Firebase + post/comment/vote/admin + search bar logic goes here — unchanged)
+  </script>
+</body>
+</html>
+
